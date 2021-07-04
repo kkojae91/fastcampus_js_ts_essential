@@ -125,6 +125,9 @@ var ajax = new XMLHttpRequest();
 var content = document.createElement("div");
 var NEWS_URL = "https://api.hnpwa.com/v0/news/1.json";
 var CONTENT_URL = "https://api.hnpwa.com/v0/item/@id.json";
+var store = {
+  currentPage: 1
+};
 
 function getData(url) {
   // 동기적으로 처리할 경우 마지막 옵션 값을 false를 주면 됩니다.
@@ -136,28 +139,34 @@ function getData(url) {
 
 function newsFeed() {
   var newsFeed = getData(NEWS_URL);
+  var newsFeedLength = newsFeed.length / 10;
+  console.log(newsFeedLength);
   var newsList = [];
   newsList.push("<ul>");
 
-  for (var i = 0; i < 10; i++) {
-    newsList.push("\n    <li>\n      <a href=\"#".concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, " (").concat(newsFeed[i].comments_count, ")</a>\n    </li>\n    "));
+  for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
+    newsList.push("\n    <li>\n      <a href=\"#/show/".concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, " (").concat(newsFeed[i].comments_count, ")</a>\n    </li>\n    "));
   }
 
   newsList.push("</ul>");
+  newsList.push("\n    <div>\n      <a href='#/page/".concat(store.currentPage > 1 ? store.currentPage - 1 : 1, "'>\uC774\uC804 \uD398\uC774\uC9C0</a>\n      <a href='#/page/").concat(store.currentPage < newsFeedLength ? store.currentPage + 1 : 3, "'>\uB2E4\uC74C \uD398\uC774\uC9C0</a>\n    </div>\n  "));
   container.innerHTML = newsList.join("");
 }
 
 function newsDetail() {
   // substr(startIndex, length), substring(startIndex, endIndex), slice(startIndex, endIndex) 문자열 잘라내는 방법!
-  var id = location.hash.substr(1);
+  var id = location.hash.substr(7);
   var newsContent = getData(CONTENT_URL.replace("@id", id));
-  container.innerHTML = "\n    <h1>".concat(newsContent.title, "</h1>\n    <div>\n      <a href=\"#\">\uBAA9\uB85D\uC73C\uB85C</a>\n    </div>\n  ");
+  container.innerHTML = "\n    <h1>".concat(newsContent.title, "</h1>\n    <div>\n      <a href=\"#/page/").concat(store.currentPage, "\">\uBAA9\uB85D\uC73C\uB85C</a>\n    </div>\n  ");
 }
 
 function router() {
   var routePath = location.hash;
 
   if (routePath === "") {
+    newsFeed();
+  } else if (routePath.indexOf("#/page/") >= 0) {
+    store.currentPage = Number(routePath.substr(7));
     newsFeed();
   } else {
     newsDetail();
