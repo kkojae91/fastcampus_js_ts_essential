@@ -129,32 +129,43 @@ var CONTENT_URL = "https://api.hnpwa.com/v0/item/@id.json";
 function getData(url) {
   // 동기적으로 처리할 경우 마지막 옵션 값을 false를 주면 됩니다.
   ajax.open("GET", url, false);
-  ajax.send(); // ajax.response 를 사용하면 값을 불러 올 수 있다 JSON 타입
-  // JSON파일을 객체화 시켜주기 위해 JSON.parse를 사용!
+  ajax.send(); // JSON파일을 객체화 시켜주기 위해 JSON.parse를 사용!
 
   return JSON.parse(ajax.response);
 }
 
-var newsFeed = getData(NEWS_URL);
-var ul = document.createElement("ul");
-window.addEventListener("hashchange", function () {
+function newsFeed() {
+  var newsFeed = getData(NEWS_URL);
+  var newsList = [];
+  newsList.push("<ul>");
+
+  for (var i = 0; i < 10; i++) {
+    newsList.push("\n    <li>\n      <a href=\"#".concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, " (").concat(newsFeed[i].comments_count, ")</a>\n    </li>\n    "));
+  }
+
+  newsList.push("</ul>");
+  container.innerHTML = newsList.join("");
+}
+
+function newsDetail() {
   // substr(startIndex, length), substring(startIndex, endIndex), slice(startIndex, endIndex) 문자열 잘라내는 방법!
   var id = location.hash.substr(1);
   var newsContent = getData(CONTENT_URL.replace("@id", id));
-  var title = document.createElement("h1");
-  title.innerHTML = newsContent.title;
-  content.appendChild(title);
-}); // dom API를 최대한 사용하지 않고 innerHTML을 사용해서 마크업 구조를 한눈에 보기 쉽게 수정
-
-for (var i = 0; i < 10; i++) {
-  var div = document.createElement("div");
-  div.innerHTML = "\n  <li>\n    <a href=\"#".concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, " (").concat(newsFeed[i].comments_count, ")</a>\n  </li>\n  "); // div는 담아주는 그릇이였기때문에, ul테그 안에 firstElementChild를 활용해서 li태그만 append 해준다.
-
-  ul.appendChild(div.firstElementChild);
+  container.innerHTML = "\n    <h1>".concat(newsContent.title, "</h1>\n    <div>\n      <a href=\"#\">\uBAA9\uB85D\uC73C\uB85C</a>\n    </div>\n  ");
 }
 
-container.appendChild(ul);
-container.appendChild(content);
+function router() {
+  var routePath = location.hash;
+
+  if (routePath === "") {
+    newsFeed();
+  } else {
+    newsDetail();
+  }
+}
+
+window.addEventListener("hashchange", router);
+router();
 },{}],"../../../../../../usr/local/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
