@@ -5,16 +5,29 @@ type Store = {
   feeds: NewsFeed[];
 }
 
-type NewsFeed = {
+type News = {
   id: number;
-  comments_count: number;
+  time_ago: string;
+  title: string;
   url: string;
   user: string;
-  time_ago: string;
+  content: string;
+}
+
+type NewsFeed = News & {
+  comments_count: number;
   points: number;
-  title: string;
   // optional 있어도 되고, 없어도 되고
   read?: boolean;
+}
+
+type NewsDetail = News & {
+  comments: NewsComment[];
+}
+
+type NewsComment = News & {
+  comments: NewsComment[];
+  level: number;
 }
 
 const container: Element | null = document.querySelector("#root");
@@ -27,7 +40,7 @@ const store: Store = {
   feeds: [],
 };
 
-function getData(url) {
+function getData<AjaxResponse>(url: string): AjaxResponse {
   // 동기적으로 처리할 경우 마지막 옵션 값을 false를 주면 됩니다.
   ajax.open("GET", url, false);
   ajax.send();
@@ -36,7 +49,7 @@ function getData(url) {
   return JSON.parse(ajax.response);
 }
 
-function makeFeeds(feeds) {
+function makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
   for (let i = 0; i < feeds.length; i++) {
     feeds[i].read = false;
   }
@@ -44,7 +57,7 @@ function makeFeeds(feeds) {
   return feeds;
 }
 
-function updateView(html) {
+function updateView(html: string): void {
   if (container != null) {
     container.innerHTML = html;
   } else {
@@ -52,7 +65,7 @@ function updateView(html) {
   }
 }
 
-function newsFeed() {
+function newsFeed(): void {
   let newsFeed: NewsFeed[] = store.feeds;
   const newsFeedLength = newsFeed.length / 10;
   const newsList = [];
@@ -82,7 +95,7 @@ function newsFeed() {
   `;
 
   if (newsFeed.length === 0) {
-    newsFeed = store.feeds = makeFeeds(getData(NEWS_URL));
+    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL));
   }
 
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
@@ -110,16 +123,16 @@ function newsFeed() {
   }
 
   template = template.replace("{{__news_feed__}}", newsList.join(""));
-  template = template.replace("{{__prev_page__}}", store.currentPage > 1 ? store.currentPage - 1 : 1);
-  template = template.replace("{{__next_page__}}", store.currentPage < newsFeedLength ? store.currentPage + 1 : 3);
+  template = template.replace("{{__prev_page__}}", String(store.currentPage > 1 ? store.currentPage - 1 : 1));
+  template = template.replace("{{__next_page__}}", String(store.currentPage < newsFeedLength ? store.currentPage + 1 : 3));
 
   updateView(template);
 }
 
-function newsDetail() {
+function newsDetail(): void {
   // substr(startIndex, length), substring(startIndex, endIndex), slice(startIndex, endIndex) 문자열 잘라내는 방법!
   const id = location.hash.substr(7);
-  const newsContent = getData(CONTENT_URL.replace("@id", id));
+  const newsContent = getData<NewsDetail>(CONTENT_URL.replace("@id", id));
   const template = `
   <div class="bg-gray-600 min-h-screen pb-8">
     <div class="bg-white text-xl">
@@ -156,32 +169,34 @@ function newsDetail() {
     }
   }
 
-  function makeComment(comments, called = 0) {
-    const commentString = [];
-
-    for (let i = 0; i < comments.length; i++) {
-      commentString.push(`
-      <div style="padding-left: ${called * 40}px;" class="mt-4">
-        <div class="text-gray-400">
-          <i class="fa fa-sort-up mr-2"></i>
-          <strong>${comments[i].user}</strong> ${comments[i].time_ago}
-        </div>
-        <p class="text-gray-700">${comments[i].content}</p>
-      </div>  
-      `);
-
-      if (comments[i].comments.length > 0) {
-        commentString.push(makeComment(comments[i].comments, called + 1));
-      }
-    }
-
-    return commentString.join("");
-  }
-
   updateView(template.replace("{{__comments__}}", makeComment(newsContent.comments)));
 }
 
-function router() {
+function makeComment(comments: NewsComment[]): string {
+  const commentString = [];
+
+  for (let i = 0; i < comments.length; i++) {
+    const comment: NewsComment = comments[i];
+
+    commentString.push(`
+    <div style="padding-left: ${comment.level * 40}px;" class="mt-4">
+      <div class="text-gray-400">
+        <i class="fa fa-sort-up mr-2"></i>
+        <strong>${comment.user}</strong> ${comment.time_ago}
+      </div>
+      <p class="text-gray-700">${comment.content}</p>
+    </div>  
+    `);
+
+    if (comment.comments.length > 0) {
+      commentString.push(makeComment(comment.comments));
+    }
+  }
+
+  return commentString.join("");
+}
+
+function router(): void {
   const routePath = location.hash;
 
   if (routePath === "") {
