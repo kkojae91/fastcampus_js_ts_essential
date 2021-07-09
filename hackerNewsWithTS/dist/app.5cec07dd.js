@@ -145,23 +145,40 @@ var Router =
 /** @class */
 function () {
   function Router() {
-    window.addEventListener("hashchange", this.route.bind(this));
-    this.routeTable = [];
+    window.addEventListener('hashchange', this.route.bind(this));
+    this.isStart = false;
     this.defaultRoute = null;
+    this.routeTable = [];
   }
 
-  Router.prototype.setDefaultPage = function (page) {
+  Router.prototype.setDefaultPage = function (page, params) {
+    if (params === void 0) {
+      params = null;
+    }
+
     this.defaultRoute = {
-      path: "",
-      page: page
+      path: '',
+      page: page,
+      params: params
     };
   };
 
-  Router.prototype.addRoutePath = function (path, page) {
+  Router.prototype.addRoutePath = function (path, page, params) {
+    if (params === void 0) {
+      params = null;
+    }
+
     this.routeTable.push({
       path: path,
-      page: page
+      page: page,
+      params: params
     });
+
+    if (!this.isStart) {
+      this.isStart = true; // Execute next tick
+
+      setTimeout(this.route.bind(this), 0);
+    }
   };
 
   Router.prototype.route = function () {
@@ -169,8 +186,9 @@ function () {
 
     var routePath = location.hash;
 
-    if (routePath === "" && this.defaultRoute) {
+    if (routePath === '' && this.defaultRoute) {
       this.defaultRoute.page.render();
+      return;
     }
 
     try {
@@ -178,8 +196,17 @@ function () {
         var routeInfo = _c.value;
 
         if (routePath.indexOf(routeInfo.path) >= 0) {
-          routeInfo.page.render();
-          break;
+          if (routeInfo.params) {
+            var parseParams = routePath.match(routeInfo.params);
+
+            if (parseParams) {
+              routeInfo.page.render.apply(null, [parseParams[1]]);
+            }
+          } else {
+            routeInfo.page.render();
+          }
+
+          return;
         }
       }
     } catch (e_1_1) {
@@ -210,13 +237,13 @@ var View =
 /** @class */
 function () {
   function View(containerId, template) {
-    var containerElement = document.getElementById(containerId);
+    var conatinerElement = document.getElementById(containerId);
 
-    if (!containerElement) {
-      throw "최상위 컨테이너가 없어 UI를 진행하지 못합니다.";
+    if (!conatinerElement) {
+      throw '최상위 컨테이너가 없어 UI를 진행하지 못합니다.';
     }
 
-    this.container = containerElement;
+    this.container = conatinerElement;
     this.template = template;
     this.renderTemplate = template;
     this.htmlList = [];
@@ -232,7 +259,7 @@ function () {
   };
 
   View.prototype.getHtml = function () {
-    var snapshot = this.htmlList.join("");
+    var snapshot = this.htmlList.join('');
     this.clearHtmlList();
     return snapshot;
   };
@@ -283,38 +310,54 @@ var __extends = this && this.__extends || function () {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.NewsDetailApi = exports.NewsFeedApi = exports.Api = void 0;
+exports.NewsDetailApi = exports.NewsFeedApi = void 0;
 
 var Api =
 /** @class */
 function () {
   function Api(url) {
-    this.ajax = new XMLHttpRequest();
+    this.xhr = new XMLHttpRequest();
     this.url = url;
   }
 
-  Api.prototype.getRequest = function () {
-    this.ajax.open("GET", this.url, false);
-    this.ajax.send();
-    return JSON.parse(this.ajax.response);
+  Api.prototype.getRequestWithXHR = function (cb) {
+    var _this = this;
+
+    this.xhr.open('GET', this.url);
+    this.xhr.addEventListener('load', function () {
+      cb(JSON.parse(_this.xhr.response));
+    });
+    this.xhr.send();
+  };
+
+  Api.prototype.getRequestWithPromise = function (cb) {
+    fetch(this.url).then(function (response) {
+      return response.json();
+    }).then(cb).catch(function () {
+      console.error('데이타를 불러오지 못했습니다.');
+    });
   };
 
   return Api;
 }();
 
-exports.Api = Api;
+exports.default = Api;
 
 var NewsFeedApi =
 /** @class */
 function (_super) {
   __extends(NewsFeedApi, _super);
 
-  function NewsFeedApi() {
-    return _super !== null && _super.apply(this, arguments) || this;
+  function NewsFeedApi(url) {
+    return _super.call(this, url) || this;
   }
 
-  NewsFeedApi.prototype.getData = function () {
-    return this.getRequest();
+  NewsFeedApi.prototype.getDataWithXHR = function (cb) {
+    return this.getRequestWithXHR(cb);
+  };
+
+  NewsFeedApi.prototype.getDataWithPromise = function (cb) {
+    return this.getRequestWithPromise(cb);
   };
 
   return NewsFeedApi;
@@ -327,12 +370,16 @@ var NewsDetailApi =
 function (_super) {
   __extends(NewsDetailApi, _super);
 
-  function NewsDetailApi() {
-    return _super !== null && _super.apply(this, arguments) || this;
+  function NewsDetailApi(url) {
+    return _super.call(this, url) || this;
   }
 
-  NewsDetailApi.prototype.getData = function () {
-    return this.getRequest();
+  NewsDetailApi.prototype.getDataWithXHR = function (cb) {
+    return this.getRequestWithXHR(cb);
+  };
+
+  NewsDetailApi.prototype.getDataWithPromise = function (cb) {
+    return this.getRequestWithPromise(cb);
   };
 
   return NewsDetailApi;
@@ -346,8 +393,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.CONTENT_URL = exports.NEWS_URL = void 0;
-exports.NEWS_URL = "https://api.hnpwa.com/v0/news/1.json";
-exports.CONTENT_URL = "https://api.hnpwa.com/v0/item/@id.json";
+exports.NEWS_URL = 'https://api.hnpwa.com/v0/news/1.json';
+exports.CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json';
 },{}],"src/page/news-detail-view.ts":[function(require,module,exports) {
 "use strict";
 
@@ -395,7 +442,7 @@ var api_1 = require("../core/api");
 
 var config_1 = require("../config");
 
-var template = "\n  <div class=\"bg-gray-600 min-h-screen pb-8\">\n    <div class=\"bg-white text-xl\">\n      <div class=\"mx-auto px-4\">\n        <div class=\"flex justify-between items-center py-6\">\n          <div class=\"flex justify-start\">\n            <h1 class=\"font-extrabold\">Hacker News</h1>\n          </div>\n          <div class=\"items-center justify-end\">\n            <a href=\"#/page/{{__currentPage__}}\" class=\"text-gray-500\">\n              <i class=\"fa fa-times\"></i>\n            </a>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n      <h2>{{__title__}}</h2>\n      <div class=\"text-gray-400 h-20\">\n        {{__content__}}\n      </div>\n\n      {{__comments__}}\n\n    </div>\n  </div>\n";
+var template = "\n<div class=\"bg-gray-600 min-h-screen pb-8\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/{{__currentPage__}}\" class=\"text-gray-500\">\n            <i class=\"fa fa-times\"></i>\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n    <h2>{{__title__}}</h2>\n    <div class=\"text-gray-400 h-20\">\n      {{__content__}}\n    </div>\n    {{__comments__}}\n  </div>\n</div>\n";
 
 var NewsDetailView =
 /** @class */
@@ -405,21 +452,30 @@ function (_super) {
   function NewsDetailView(containerId, store) {
     var _this = _super.call(this, containerId, template) || this;
 
+    _this.render = function (id) {
+      var api = new api_1.NewsDetailApi(config_1.CONTENT_URL.replace('@id', id));
+      api.getDataWithPromise(function (data) {
+        var title = data.title,
+            content = data.content,
+            comments = data.comments;
+
+        _this.store.makeRead(Number(id));
+
+        _this.setTemplateData('currentPage', _this.store.currentPage.toString());
+
+        _this.setTemplateData('title', title);
+
+        _this.setTemplateData('content', content);
+
+        _this.setTemplateData('comments', _this.makeComment(comments));
+
+        _this.updateView();
+      });
+    };
+
     _this.store = store;
     return _this;
   }
-
-  NewsDetailView.prototype.render = function () {
-    var id = location.hash.substr(7);
-    var api = new api_1.NewsDetailApi(config_1.CONTENT_URL.replace("@id", id));
-    var newsDetail = api.getData();
-    this.store.makeRead(Number(id));
-    this.setTemplateData("currentPage", String(this.store.currentPage.toString()));
-    this.setTemplateData("title", newsDetail.title);
-    this.setTemplateData("content", newsDetail.content);
-    this.setTemplateData("comments", this.makeComment(newsDetail.comments));
-    this.updateView();
-  };
 
   NewsDetailView.prototype.makeComment = function (comments) {
     for (var i = 0; i < comments.length; i++) {
@@ -485,7 +541,7 @@ var api_1 = require("../core/api");
 
 var config_1 = require("../config");
 
-var template = "\n  <div class=\"bg-gray-600 min-h-screen\">\n    <div class=\"bg-white text-xl\">\n      <div class=\"mx-auto px-4\">\n        <div class=\"flex justify-between items-center py-6\">\n          <div class=\"flex justify-start\">\n            <h1 class=\"font-extrabold\">Hacker News</h1>\n          </div>\n          <div class=\"items-center justify-end\">\n            <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n              Previous\n            </a>\n            <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n              Next\n            </a>\n          </div>\n        </div> \n      </div>\n    </div>\n    <div class=\"p-4 text-2xl text-gray-700\">\n      {{__news_feed__}}        \n    </div>\n  </div>\n";
+var template = "\n<div class=\"bg-gray-600 min-h-screen\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n            Previous\n          </a>\n          <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n            Next\n          </a>\n        </div>\n      </div> \n    </div>\n  </div>\n  <div class=\"p-4 text-2xl text-gray-700\">\n    {{__news_feed__}}        \n  </div>\n</div>\n";
 
 var NewsFeedView =
 /** @class */
@@ -495,37 +551,51 @@ function (_super) {
   function NewsFeedView(containerId, store) {
     var _this = _super.call(this, containerId, template) || this;
 
+    _this.render = function (page) {
+      if (page === void 0) {
+        page = '1';
+      }
+
+      _this.store.currentPage = Number(page);
+
+      if (!_this.store.hasFeeds) {
+        _this.api.getDataWithPromise(function (feeds) {
+          _this.store.setFeeds(feeds);
+
+          _this.renderView();
+        });
+      }
+
+      _this.renderView();
+    };
+
+    _this.renderView = function () {
+      for (var i = (_this.store.currentPage - 1) * 10; i < _this.store.currentPage * 10; i++) {
+        var _a = _this.store.getFeed(i),
+            id = _a.id,
+            title = _a.title,
+            comments_count = _a.comments_count,
+            user = _a.user,
+            points = _a.points,
+            time_ago = _a.time_ago,
+            read = _a.read;
+
+        _this.addHtml("\n        <div class=\"p-6 " + (read ? 'bg-red-500' : 'bg-white') + " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n          <div class=\"flex\">\n            <div class=\"flex-auto\">\n              <a href=\"#/show/" + id + "\">" + title + "</a>  \n            </div>\n            <div class=\"text-center text-sm\">\n              <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">" + comments_count + "</div>\n            </div>\n          </div>\n          <div class=\"flex mt-3\">\n            <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n              <div><i class=\"fas fa-user mr-1\"></i>" + user + "</div>\n              <div><i class=\"fas fa-heart mr-1\"></i>" + points + "</div>\n              <div><i class=\"far fa-clock mr-1\"></i>" + time_ago + "</div>\n            </div>  \n          </div>\n        </div>    \n      ");
+      }
+
+      _this.setTemplateData('news_feed', _this.getHtml());
+
+      _this.setTemplateData('prev_page', String(_this.store.prevPage));
+
+      _this.setTemplateData('next_page', String(_this.store.nextPage));
+
+      _this.updateView();
+    };
+
     _this.store = store;
     _this.api = new api_1.NewsFeedApi(config_1.NEWS_URL);
-
-    if (!_this.store.hasFeeds) {
-      _this.store.setFeeds(_this.api.getData());
-    }
-
     return _this;
   }
-
-  NewsFeedView.prototype.render = function () {
-    this.store.currentPage = Number(location.hash.substr(7) || 1);
-
-    for (var i = (this.store.currentPage - 1) * 10; i < this.store.currentPage * 10; i++) {
-      var _a = this.store.getFeed(i),
-          id = _a.id,
-          title = _a.title,
-          comments_count = _a.comments_count,
-          user = _a.user,
-          points = _a.points,
-          time_ago = _a.time_ago,
-          read = _a.read;
-
-      this.addHtml("\n        <div class=\"p-6 " + (read ? "bg-red-500" : "bg-white") + " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n          <div class=\"flex\">\n            <div class=\"flex-auto\">\n              <a href=\"#/show/" + id + "\">" + title + "</a>  \n            </div>\n            <div class=\"text-center text-sm\">\n              <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">" + comments_count + "</div>\n            </div>\n          </div>\n          <div class=\"flex mt-3\">\n            <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n              <div><i class=\"fas fa-user mr-1\"></i>" + user + "</div>\n              <div><i class=\"fas fa-heart mr-1\"></i>" + points + "</div>\n              <div><i class=\"far fa-clock mr-1\"></i>" + time_ago + "</div>\n            </div>  \n          </div>\n        </div>    \n      ");
-    }
-
-    this.setTemplateData("news_feed", this.getHtml());
-    this.setTemplateData("prev_page", String(this.store.prevPage));
-    this.setTemplateData("next_page", String(this.store.nextPage));
-    this.updateView();
-  };
 
   return NewsFeedView;
 }(view_1.default);
@@ -584,11 +654,22 @@ var __assign = this && this.__assign || function () {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.Store = void 0;
 
 var Store =
 /** @class */
 function () {
   function Store() {
+    var _this = this;
+
+    this.setFeeds = function (feeds) {
+      _this.feeds = feeds.map(function (feed) {
+        return __assign(__assign({}, feed), {
+          read: false
+        });
+      });
+    };
+
     this.feeds = [];
     this._currentPage = 1;
   }
@@ -632,20 +713,12 @@ function () {
     configurable: true
   });
 
-  Store.prototype.getAllFeeds = function () {
-    return this.feeds;
-  };
-
   Store.prototype.getFeed = function (position) {
     return this.feeds[position];
   };
 
-  Store.prototype.setFeeds = function (feeds) {
-    this.feeds = feeds.map(function (feed) {
-      return __assign(__assign({}, feed), {
-        read: false
-      });
-    });
+  Store.prototype.getAllFeeds = function () {
+    return this.feeds;
   };
 
   Store.prototype.makeRead = function (id) {
@@ -661,7 +734,7 @@ function () {
   return Store;
 }();
 
-exports.default = Store;
+exports.Store = Store;
 },{}],"src/app.ts":[function(require,module,exports) {
 "use strict";
 
@@ -679,16 +752,15 @@ var router_1 = __importDefault(require("./core/router"));
 
 var page_1 = require("./page");
 
-var store_1 = __importDefault(require("./store"));
+var store_1 = require("./store");
 
-var store = new store_1.default();
+var store = new store_1.Store();
 var router = new router_1.default();
-var newsFeedView = new page_1.NewsFeedView("root", store);
-var newsDetailView = new page_1.NewsDetailView("root", store);
+var newsFeedView = new page_1.NewsFeedView('root', store);
+var newsDetailView = new page_1.NewsDetailView('root', store);
 router.setDefaultPage(newsFeedView);
-router.addRoutePath("/page/", newsFeedView);
-router.addRoutePath("/show/", newsDetailView);
-router.route();
+router.addRoutePath('/page/', newsFeedView, /page\/(\d+)/);
+router.addRoutePath('/show/', newsDetailView, /show\/(\d+)/);
 },{"./core/router":"src/core/router.ts","./page":"src/page/index.ts","./store":"src/store.ts"}],"../../../../../../usr/local/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
@@ -717,7 +789,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "50775" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "52871" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
